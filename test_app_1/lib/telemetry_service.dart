@@ -1,12 +1,39 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'storage_service.dart';
 
 class TelemetryService {
-  static const String _userId = "Noah";
+  static String? _userId;
+
+  /// Initialize and retrieve unique device ID
+  static Future<String> _getDeviceId() async {
+    if (_userId != null) return _userId!;
+
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      String deviceId;
+
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        deviceId = androidInfo.id; // Unique Android ID
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        deviceId = iosInfo.identifierForVendor ?? 'unknown';
+      } else {
+        deviceId = 'unknown';
+      }
+
+      _userId = deviceId;
+      return _userId!;
+    } catch (e) {
+      _userId = 'error_${DateTime.now().millisecondsSinceEpoch}';
+      return _userId!;
+    }
+  }
 
   /// Request location permission and return the result
   static Future<bool> _requestLocationPermission() async {
@@ -45,21 +72,30 @@ class TelemetryService {
     String timestamp,
   ) {
     return {
-      'user': _userId,
-      'latitude': latitude,
-      'longitude': longitude,
+      'user': _userId ?? 'unknown',
+      'latitude': latitude.toString(),
+      'Longitude': longitude.toString(),
       'time': timestamp,
     };
   }
 
+  /// Format ISO 8601 timestamp to ISO 8601 string format
+  static String _formatTimeAsIso8601(String isoTimestamp) {
+    final dateTime = DateTime.parse(isoTimestamp);
+    return dateTime.toIso8601String().split('.')[0];
+  }
+
   /// Get current system time as ISO 8601 string
   static String _getCurrentTimestamp() {
-    return DateTime.now().toIso8601String();
+    return DateTime.now().toIso8601String().split('.')[0];
   }
 
   /// Send GPS data to ngrok endpoint
   static Future<TelemetryResponse> sendGpsData() async {
     try {
+      // Step 0: Initialize device ID
+      await _getDeviceId();
+
       // Step 1: Request location permission
       final hasPermission = await _requestLocationPermission();
       if (!hasPermission) {
@@ -108,7 +144,7 @@ class TelemetryService {
         body: jsonEncode(payload),
       ).timeout(
         const Duration(seconds: 15),
-        onTimeout: () => throw SocketException('Request timeout'),
+        onTimeout: () => throw const SocketException('Request timeout'),
       );
 
       return TelemetryResponse(

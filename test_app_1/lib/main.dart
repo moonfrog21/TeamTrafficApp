@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'storage_service.dart';
 import 'settings_screen.dart';
 import 'telemetry_service.dart';
@@ -33,40 +34,47 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isSending = false;
+  bool _isTransmitting = false;
+  Timer? _transmissionTimer;
 
-  /// Handle the "Send GPS data" button press
-  Future<void> _sendGpsData() async {
+  /// Handle the GPS data transmission toggle
+  Future<void> _toggleGpsTransmission() async {
     setState(() {
-      _isSending = true;
+      _isTransmitting = !_isTransmitting;
     });
 
-    try {
-      final response = await TelemetryService.sendGpsData();
+    if (_isTransmitting) {
+      // Start the periodic transmission
+      _transmissionTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) async {
+          try {
+            final response = await TelemetryService.sendGpsData();
 
-      if (mounted) {
-        final snackBar = SnackBar(
-          content: Text(response.message),
-          backgroundColor: response.success ? Colors.green : Colors.red,
-          duration: const Duration(seconds: 3),
-        );
-        ScaffoldMessenger.of(context).showSnackBar(snackBar);
-      }
-    } catch (e) {
-      if (mounted) {
-        final snackBar = SnackBar(
-          content: Text('Unexpected error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        );
-        ScaffoldMessenger.of(context).showSnackBar(snackBar);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
-      }
+            if (mounted) {
+              final snackBar = SnackBar(
+                content: Text(response.message),
+                backgroundColor: response.success ? Colors.green : Colors.red,
+                duration: const Duration(seconds: 2),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(snackBar);
+            }
+          } catch (e) {
+            if (mounted) {
+              final snackBar = SnackBar(
+                content: Text('Transmission error: ${e.toString()}'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 2),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(snackBar);
+            }
+          }
+        },
+      );
+    } else {
+      // Stop the periodic transmission
+      _transmissionTimer?.cancel();
+      _transmissionTimer = null;
     }
   }
 
@@ -75,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
+  }
+
+  @override
+  void dispose() {
+    // Cleanup timer on widget disposal
+    _transmissionTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -110,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Tap the button below to send your current location',
+              'Toggle to start continuous GPS data transmission',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -121,25 +136,20 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(
               width: 280,
               child: ElevatedButton.icon(
-                onPressed: _isSending ? null : _sendGpsData,
-                icon: _isSending
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.send),
+                onPressed: _toggleGpsTransmission,
+                icon: Icon(
+                  _isTransmitting ? Icons.stop : Icons.play_arrow,
+                ),
                 label: Text(
-                  _isSending ? 'Sending...' : 'Send GPS data',
+                  _isTransmitting
+                      ? 'Stop GPS Data Transmit'
+                      : 'Start GPS Data Transmit',
                   style: const TextStyle(fontSize: 16),
                 ),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.blue,
+                  backgroundColor:
+                      _isTransmitting ? Colors.red : Colors.green,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -148,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Make sure you have configured your ngrok URL in Settings before sending data.',
+                'Make sure you have configured your ngrok URL in Settings before sending data. Transmission occurs every 5 seconds.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.orange,
