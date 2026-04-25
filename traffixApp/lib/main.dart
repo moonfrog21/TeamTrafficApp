@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'storage_service.dart';
 import 'settings_screen.dart';
 import 'telemetry_service.dart';
@@ -92,6 +93,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  static const CameraPosition _initialPosition = CameraPosition(
+    target: LatLng(37.42796133580664, -122.085749655962),
+    zoom: 14.4746,
+  );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,69 +112,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.location_on,
-              size: 64,
-              color: Colors.blue,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'GPS Telemetry Tracker',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Toggle to start continuous GPS data transmission',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: 280,
-              child: ElevatedButton.icon(
-                onPressed: _toggleGpsTransmission,
-                icon: Icon(
-                  _isTransmitting ? Icons.stop : Icons.play_arrow,
-                ),
-                label: Text(
-                  _isTransmitting
-                      ? 'Stop GPS Data Transmit'
-                      : 'Start GPS Data Transmit',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor:
-                      _isTransmitting ? Colors.red : Colors.green,
-                  foregroundColor: Colors.white,
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: _initialPosition,
+            onMapCreated: (GoogleMapController controller) {
+              // Controller will be used in step 4
+            },
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 32.0),
+              child: SizedBox(
+                width: 200,
+                child: ElevatedButton.icon(
+                  onPressed: _toggleGpsTransmission,
+                  icon: Icon(
+                    _isTransmitting ? Icons.stop : Icons.play_arrow,
+                    size: 20,
+                  ),
+                  label: Text(
+                    _isTransmitting ? 'Stop Transmit' : 'Start Transmit',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: _isTransmitting ? Colors.red : Colors.green,
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Make sure you have configured your ngrok URL in Settings before sending data. Transmission occurs every 5 seconds.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.orange,
-                  fontStyle: FontStyle.italic,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
